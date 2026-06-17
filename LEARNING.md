@@ -1,0 +1,446 @@
+# TypeScript Learning Journal — Expense Tracker
+
+A step-by-step record of TypeScript concepts learned while building this project.
+
+---
+
+## Setup
+
+- **Vite + React + TypeScript** — scaffolded with `npm create vite@latest . -- --template react-ts`
+- Dev server runs at `http://localhost:5173` via `npm run dev`
+
+---
+
+## Step 1: Data Model — Types & Interfaces
+
+**File:** `src/types/expense.ts`
+
+### Concept: `type` vs `interface`
+
+```typescript
+// A basic type alias — gives a name to any type
+type Category = string;
+
+// An interface describes the shape of an object
+export interface Expense {
+  id: string;
+  title: string;
+  amount: number;
+  date: string;
+  category: Category;
+  note?: string;       // ? means optional (can be undefined)
+}
+```
+
+### Key takeaways
+
+- `interface` defines the **shape of an object** — TypeScript enforces every required field
+- `type` creates an **alias** for any type (primitives, objects, unions, etc.)
+- `?` marks a field as **optional** — it can be omitted or undefined
+- Fields have explicit types: `string`, `number` — no implicit `any`
+- If you remove a required field (e.g. `amount`), TypeScript flags it immediately as an error
+
+### Using the interface
+
+```typescript
+import { Expense } from './types/expense';
+
+const sample: Expense = {
+  id: '1',
+  title: 'Groceries',
+  amount: 85.50,
+  date: '2026-06-17',
+  category: 'Food',
+  // note is optional, so we can omit it
+};
+```
+
+### `type` vs `interface` — when to use which?
+
+| | `interface` | `type` |
+|---|---|---|
+| Object shapes | ✅ Preferred | ✅ Works |
+| Primitives / unions | ❌ | ✅ Required |
+| Extendable | ✅ `extends` | ✅ `&` intersection |
+| General rule | Use for objects | Use for everything else |
+
+---
+
+---
+
+## Step 2: Enums for Categories
+
+**File:** `src/types/expense.ts`
+
+### Concept: `enum`
+
+```typescript
+export enum Category {
+  Food = 'Food',
+  Transport = 'Transport',
+  Housing = 'Housing',
+  Entertainment = 'Entertainment',
+  Health = 'Health',
+  Other = 'Other',
+}
+```
+
+Update the `Expense` interface to use it:
+```typescript
+export interface Expense {
+  ...
+  category: Category;   // now restricted to enum values only
+}
+```
+
+Use it in data:
+```typescript
+import { Expense, Category } from '../types/expense';
+
+const sample: Expense = {
+  category: Category.Food,  // type Category. to see autocomplete
+};
+```
+
+### Key takeaways
+
+- `enum` restricts a field to a **fixed set of named constants** — no typos possible
+- String enums (`Category = 'Food'`) are preferred over numeric enums (`Category = 0`) because the value is human-readable in logs, APIs, and the UI
+- TypeScript flags `category: 'food'` as an error — must use `Category.Food`
+- Enums generate **runtime JavaScript** (unlike interfaces/types which are erased) — that's why `erasableSyntaxOnly` had to be disabled
+
+### `erasableSyntaxOnly` flag
+
+Vite's default `tsconfig.app.json` (line 21) sets:
+```json
+"erasableSyntaxOnly": true
+```
+
+This disallows any TypeScript syntax that generates **runtime JavaScript** — enums and namespaces are the main culprits. The idea is that TypeScript should only add types, which are fully erased at compile time, keeping the output JS clean and predictable.
+
+We disabled it for learning purposes:
+```json
+"erasableSyntaxOnly": false
+```
+
+### Modern alternative: `as const`
+
+If you want to keep `erasableSyntaxOnly: true` (stricter/modern projects), use this pattern instead of enum:
+
+```typescript
+export const Category = {
+  Food: 'Food',
+  Transport: 'Transport',
+  Housing: 'Housing',
+  Entertainment: 'Entertainment',
+  Health: 'Health',
+  Other: 'Other',
+} as const;
+
+// Derive the type from the object values
+export type Category = typeof Category[keyof typeof Category];
+```
+
+- `as const` tells TypeScript to treat all values as **literal types** (not just `string`)
+- `typeof Category[keyof typeof Category]` derives the union type `'Food' | 'Transport' | 'Housing' | ...` automatically
+- Usage is identical: `Category.Food` — autocomplete still works
+- No runtime overhead — the object exists at runtime but generates no extra JS like enum does
+
+| | `enum` | `as const` |
+|---|---|---|
+| Runtime JS generated | ✅ Yes | ❌ No (just an object) |
+| Autocomplete | ✅ | ✅ |
+| Works with `erasableSyntaxOnly` | ❌ | ✅ |
+| Common in older codebases | ✅ | Less common |
+| Preferred in modern TS | Less common | ✅ |
+
+---
+
+---
+
+## Step 3: Components with Typed Props
+
+**Files:** `src/components/ExpenseItem.tsx`, `src/App.tsx`
+
+### Concept: Typing props with an interface
+
+```typescript
+import type { Expense } from '../types/expense';
+
+interface ExpenseItemProps {
+  expense: Expense;
+  onDelete: (id: string) => void;  // function type: takes string, returns nothing
+}
+
+export function ExpenseItem({ expense, onDelete }: ExpenseItemProps) {
+  return (
+    <div>
+      <h3>{expense.title}</h3>
+      <p>Amount: ${expense.amount}</p>
+      <p>Category: {expense.category}</p>
+      <p>Date: {expense.date}</p>
+      {expense.note && <p>Note: {expense.note}</p>}
+      <button onClick={() => onDelete(expense.id)}>Delete</button>
+    </div>
+  );
+}
+```
+
+### Key takeaways
+
+- Props are typed with an `interface` — TypeScript enforces what you pass in
+- `(id: string) => void` is how you type a function prop — takes a string, returns nothing
+- `expense.note && <p>...</p>` safely renders optional fields — no crash if `note` is undefined
+- Passing a wrong prop type is immediately flagged as an error
+
+### `import type` vs `import`
+
+`verbatimModuleSyntax: true` in `tsconfig.app.json` requires you to be explicit about type-only imports:
+
+```typescript
+import type { Expense } from '../types/expense';  // interface — type only, erased at runtime
+import { Category } from '../types/expense';       // enum — exists at runtime as JS object
+```
+
+Without `import type`, Vite tries to import `Expense` as a JS value at runtime — but interfaces are fully erased during compilation, so the browser throws a `SyntaxError`.
+
+| What you're importing | Use |
+|---|---|
+| `interface` or `type` | `import type { ... }` |
+| `enum`, function, class, constant | `import { ... }` |
+
+### What is a React Component?
+
+A component is a **self-contained piece of UI** — it owns its own markup, logic, and sometimes state. One component = one responsibility.
+
+Think of a webpage as Lego blocks:
+
+```
+App                          ← root component, holds everything
+├── ExpenseList              ← responsible for rendering the list
+│   ├── ExpenseItem          ← responsible for ONE expense row
+│   └── ExpenseItem
+├── ExpenseForm              ← responsible for adding a new expense
+└── FilterBar                ← responsible for filtering by category
+```
+
+Each component:
+- **Receives data via props** (passed from parent)
+- **Manages its own state** if needed (e.g. form input values)
+- **Renders a piece of UI** (returns JSX)
+
+**In our case:**
+
+`ExpenseItem` has one job — render a single expense and provide a delete button. It doesn't know or care about the list, the form, or filtering. It just gets an `expense` object and an `onDelete` function via props and renders them.
+
+`App` is the parent — it holds the full list of expenses in state and passes individual items down to `ExpenseItem`.
+
+**This is why TypeScript + React is powerful** — when `App` passes props to `ExpenseItem`, TypeScript enforces the contract between them. If `App` forgets to pass `onDelete`, TypeScript flags it immediately before it ever runs in the browser.
+
+### How Delete works — data flow
+
+**`ExpenseItem` calls UP to `App`, not the other way around.**
+
+```
+User clicks Delete button (inside ExpenseItem)
+      ↓
+ExpenseItem calls onDelete(expense.id)   ← ExpenseItem initiates this
+      ↓
+App's handleDelete receives that id      ← App responds
+      ↓
+handleDelete filters out that expense
+      ↓
+setExpenses updates state
+      ↓
+React re-renders — that ExpenseItem disappears
+```
+
+- **App is the manager** — owns the data, decides what happens to it
+- **ExpenseItem is the worker** — displays one expense, doesn't know about the full list
+- When Delete is clicked, ExpenseItem says *"someone wants to delete id='1', you handle it"* — and App does
+
+### Data flows down, events flow up
+
+```
+App
+ │
+ │  expense (data flows DOWN via props)
+ │  onDelete (function flows DOWN via props)
+ ↓
+ExpenseItem
+ │
+ │  onDelete(id) (event flows UP when button clicked)
+ ↑
+App reacts and updates state
+```
+
+Components never modify data directly — they signal upward and let the **owner of the data** handle it. This is called **lifting state up** — a core React pattern.
+
+TypeScript enforces this contract:
+```typescript
+onDelete: (id: string) => void
+```
+If `ExpenseItem` tried to call `onDelete(123)` (number instead of string), TypeScript catches it immediately.
+
+### First taste of generics — `useState<Expense[]>`
+
+```typescript
+const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+```
+
+`useState` is a **generic function** — `<Expense[]>` tells TypeScript the state holds an array of `Expense` objects. We'll go deep on generics in Step 4.
+
+---
+
+---
+
+## Step 4: Generics
+
+**Files:** `src/utils/filter.ts`, `src/App.tsx`
+
+### What is a Generic?
+
+Generics let you write **reusable code that works with any type** while still being type-safe.
+
+Without generics, you'd have to write separate functions for each type:
+```typescript
+function getFirstExpense(arr: Expense[]): Expense { return arr[0]; }
+function getFirstString(arr: string[]): string { return arr[0]; }
+```
+
+With generics, one function handles any type:
+```typescript
+function getFirst<T>(arr: T[]): T {
+  return arr[0];
+}
+
+getFirst([1, 2, 3]);       // T = number
+getFirst(['a', 'b']);      // T = string
+getFirst(expenses);        // T = Expense
+```
+
+`T` is a **type parameter** — a placeholder that gets filled in when the function is called. TypeScript infers it automatically from what you pass in.
+
+---
+
+### Generic filter function
+
+**File:** `src/utils/filter.ts`
+
+```typescript
+export function filterByField<T, K extends keyof T>(
+  items: T[],
+  field: K,
+  value: T[K]
+): T[] {
+  return items.filter(item => item[field] === value);
+}
+```
+
+Breaking it down:
+- `T` — the type of items in the array (e.g. `Expense`)
+- `K extends keyof T` — `K` must be a valid key of `T` (e.g. `'category'`, `'title'`) — TypeScript will flag invalid keys immediately
+- `value: T[K]` — the value must match the type of that specific field
+- Returns `T[]` — same type as input array
+
+```typescript
+// Valid — 'category' is a key on Expense, Category.Food matches its type
+filterByField(expenses, 'category', Category.Food);
+
+// TypeScript error — 'price' is not a key on Expense
+filterByField(expenses, 'price', 'Food');
+```
+
+---
+
+### Generic with a constraint
+
+```typescript
+export function findById<T extends { id: string }>(
+  items: T[],
+  id: string
+): T | undefined {
+  return items.find(item => item.id === id);
+}
+```
+
+- `T extends { id: string }` — constrains `T` to only types that have an `id: string` field
+- `T | undefined` — returns either a `T` or `undefined` if not found — this is a **union type** (covered in Step 5)
+
+---
+
+### Seeing generics in action on the UI
+
+`App.tsx` uses `filterByField` with a selected category state to filter what's displayed:
+
+```typescript
+const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
+
+const visibleExpenses = selectedCategory === 'All'
+  ? expenses
+  : filterByField(expenses, 'category', selectedCategory);
+```
+
+`useState<Category | 'All'>` is itself a generic — it tells TypeScript the state holds either a `Category` enum value or the string `'All'`. This is a union type used as a generic argument.
+
+---
+
+### How category buttons render on screen
+
+```typescript
+{Object.values(Category).map(cat => (
+  <button key={cat} onClick={() => setSelectedCategory(cat)}>
+    {cat}
+  </button>
+))}
+```
+
+`Object.values(Category)` turns the enum into an array:
+```typescript
+['Food', 'Transport', 'Housing', 'Entertainment', 'Health', 'Other']
+```
+
+`.map()` loops over it and creates one `<button>` per value. No hardcoding — if you add a new category to the enum, a new button appears automatically without touching `App.tsx`.
+
+---
+
+### Full flow when user clicks a category button
+
+```
+Click "Food" button
+      ↓
+setSelectedCategory(Category.Food)
+      ↓
+React re-renders App (runs the component function top to bottom)
+      ↓
+visibleExpenses = filterByField(expenses, 'category', 'Food')
+      → returns only [{ title: 'Groceries', category: 'Food', ... }]
+      ↓
+.map() renders only ExpenseItem for Groceries
+      ↓
+UI shows only Groceries
+```
+
+Every time state changes, React re-runs the component function. `visibleExpenses` is recalculated fresh on every render:
+- `selectedCategory === 'All'` → return all expenses
+- Otherwise → call `filterByField` and return only matching ones
+
+The other expenses aren't hidden — they're simply **not rendered at all**.
+
+---
+
+### Key takeaways
+
+- `<T>` is a type parameter — a placeholder filled in at call time
+- `K extends keyof T` constrains a type parameter to only valid keys of another type
+- Generics make functions reusable across types without losing type safety
+- `useState<Type>` is a generic — you're telling React what type the state holds
+- `Object.values(Category)` dynamically generates buttons from the enum — adding a new category automatically adds a new button
+
+---
+
+## Up Next
+
+- Step 5: Union types and type guards
+- Step 6: Utility types (Partial, Pick, Omit, Record)
+- Step 7: Async data fetching with typed responses

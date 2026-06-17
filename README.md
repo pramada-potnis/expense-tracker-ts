@@ -42,12 +42,24 @@ App runs at `http://localhost:5173`
 
 ## Project Structure
 
+### Initial commit contains
+- `index.html` — app entry point
+- `src/main.tsx` — mounts React app
+- `src/App.tsx` — root component
+- `src/App.css`, `src/assets/` — default styles/assets
+- `tsconfig.json`, `tsconfig.node.json` — TypeScript config
+- `vite.config.ts` — Vite config
+- `package.json` — dependencies
+- `.gitignore` — node_modules etc. excluded
+
+### Source structure
 ```
 src/
 ├── main.tsx        # App entry point
 ├── App.tsx         # Root component
 ├── types/          # TypeScript type definitions
 ├── components/     # React components
+├── data/           # Sample/mock data
 └── utils/          # Helper functions
 ```
 
