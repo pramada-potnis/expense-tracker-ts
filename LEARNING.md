@@ -657,7 +657,135 @@ Both are identical — destructuring removes the `props.` prefix everywhere. `{ 
 
 ---
 
+---
+
+## Step 6: Utility Types
+
+**Files:** `src/utils/expenseUtils.ts`, `src/App.tsx`
+
+Utility types **transform existing types into new ones**. Instead of rewriting interfaces, you derive what you need from what you already have.
+
+---
+
+### `Partial<T>` — make all fields optional
+
+Useful when updating an expense — only pass the fields that changed:
+
+```typescript
+// All fields required
+const expense: Expense = {
+  id: '1', title: 'Groceries', amount: 85.50,
+  date: '2026-06-17', category: Category.Food
+};
+
+// Partial makes every field optional
+const update: Partial<Expense> = {
+  amount: 90.00   // only update amount, rest untouched
+};
+
+export function updateExpense(expense: Expense, changes: Partial<Expense>): Expense {
+  return { ...expense, ...changes };
+}
+```
+
+---
+
+### `Pick<T, K>` — keep only specific fields
+
+Useful when a component only needs a subset of a type:
+
+```typescript
+type ExpenseSummary = Pick<Expense, 'title' | 'amount'>;
+
+const summary: ExpenseSummary = {
+  title: 'Groceries',
+  amount: 85.50
+  // id, date, category not needed
+};
+
+export function summarise(expense: Expense): ExpenseSummary {
+  return { title: expense.title, amount: expense.amount };
+}
+```
+
+---
+
+### `Omit<T, K>` — remove specific fields
+
+Opposite of `Pick` — keep everything except certain fields:
+
+```typescript
+// New expense form — no id yet (generated on save)
+type NewExpense = Omit<Expense, 'id'>;
+
+export function createExpense(data: NewExpense): Expense {
+  return { ...data, id: crypto.randomUUID() };
+}
+```
+
+TypeScript errors if you try to pass `id` — `NewExpense` doesn't have it.
+
+---
+
+### `Record<K, V>` — typed key-value map
+
+Useful for grouping expenses by category:
+
+```typescript
+type ExpensesByCategory = Record<Category, Expense[]>;
+
+export function groupByCategory(expenses: Expense[]): Partial<Record<Category, Expense[]>> {
+  return expenses.reduce((acc, expense) => {
+    const key = expense.category;
+    acc[key] = [...(acc[key] ?? []), expense];
+    return acc;
+  }, {} as Partial<Record<Category, Expense[]>>);
+}
+```
+
+`Partial<Record<Category, Expense[]>>` — not every category may have expenses, so `Partial` makes all keys optional.
+
+---
+
+### Seeing it on the UI
+
+`groupByCategory` is used in `App.tsx` to show totals per category:
+
+```typescript
+const grouped = groupByCategory(expenses);
+
+{Object.entries(grouped).map(([category, items]) => (
+  <p key={category}>
+    {category}: {items?.length} expense(s) — 
+    ${items?.reduce((sum, e) => sum + e.amount, 0).toFixed(2)}
+  </p>
+))}
+```
+
+This renders a live summary — e.g. `Food: 1 expense(s) — $85.50`. Deleting an expense updates the totals automatically because `grouped` is recalculated on every render from the `expenses` state.
+
+---
+
+### Utility types at a glance
+
+| Utility type | What it does | When to use |
+|---|---|---|
+| `Partial<T>` | All fields optional | Update/patch operations |
+| `Pick<T, K>` | Keep only named fields | Summary/preview components |
+| `Omit<T, K>` | Remove named fields | Forms (no id before save) |
+| `Record<K, V>` | Typed key-value map | Grouping, lookup tables |
+
+---
+
+### Key takeaways
+
+- Utility types derive new types from existing ones — no duplication
+- `Omit<Expense, 'id'>` is safer than a separate `NewExpense` interface — stays in sync automatically when `Expense` changes
+- `Partial` is the go-to for update functions — only pass what changed
+- `Record<Category, Expense[]>` ensures every key is a valid `Category` — no arbitrary strings
+
+---
+
 ## Up Next
 
-- Step 6: Utility types (Partial, Pick, Omit, Record)
 - Step 7: Async data fetching with typed responses

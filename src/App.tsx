@@ -5,6 +5,7 @@ import { ExpenseItem } from './components/ExpenseItem';
 import { filterByField } from './utils/filter';
 import type { Alert } from './types/alert';
 import { AlertBanner } from './components/AlertBanner';
+import { groupByCategory } from './utils/expenseUtils';
 
 const initialExpenses: Expense[] = [
   {
@@ -31,6 +32,7 @@ const initialExpenses: Expense[] = [
   },
 ];
 
+
 export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
@@ -44,6 +46,8 @@ export default function App() {
   const visibleExpenses = selectedCategory === 'All'
     ? expenses
     : filterByField(expenses, 'category', selectedCategory);
+
+  const grouped = groupByCategory(expenses);
 
   return (
     <div>
@@ -60,6 +64,15 @@ export default function App() {
         ))}
       </div>
 
+      {/* Totals per category */}
+      <div>
+        {Object.entries(grouped).map(([category, items]) => (
+          <p key={category}>
+            {category}: {items?.length} expense(s) — ${items?.reduce((sum, e) => sum + e.amount, 0).toFixed(2)}
+          </p>
+        ))}
+      </div>
+
       {/* Filtered expense list */}
       {visibleExpenses.map(expense => (
         <ExpenseItem
@@ -69,5 +82,6 @@ export default function App() {
         />
       ))}
     </div>
+    
   );
 }
