@@ -580,6 +580,71 @@ Files that only use generics (like `filter.ts`) don't need to import the type at
 
 ---
 
+### Component structure — how a typed React component is organized
+
+A typed React component has 3 parts:
+
+```
+1. Type definition (.ts file)
+   └── defines the data shape (what the component works with)
+
+2. Props interface (in the .tsx file)
+   └── defines what the parent must pass in
+
+3. Export function (in the .tsx file)
+   └── the actual UI component
+```
+
+In our AlertBanner example:
+```
+src/types/alert.ts              ← Step 1: data shape
+  type SuccessAlert = { ... }
+  type ErrorAlert = { ... }
+  export type Alert = SuccessAlert | ErrorAlert | LoadingAlert
+
+src/components/AlertBanner.tsx  ← Steps 2 & 3: props + component
+  interface AlertBannerProps    ← Step 2: what parent must pass
+  export function AlertBanner   ← Step 3: the UI
+```
+
+**Steps 2 & 3 always live in the same `.tsx` file** — the props interface sits right above the component that uses it. Only data/type definitions shared across the app go in a separate `.ts` file.
+
+| File | Purpose |
+|---|---|
+| `src/types/*.ts` | Data shapes shared across the app |
+| `src/components/*.tsx` | Props interface + component UI |
+
+You don't always need a separate types file. If a type is only used by one component, define it in that `.tsx` file directly. Move it to `types/` when multiple files need it — like `Alert` or `Expense`.
+
+---
+
+### How component props syntax works
+
+```typescript
+export function AlertBanner({ alert }: AlertBannerProps)
+//             ^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^
+//             destructure alert      type the whole props object
+//             from props object      as AlertBannerProps
+```
+
+Without destructuring:
+```typescript
+function AlertBanner(props: AlertBannerProps) {
+  switch (props.alert.kind) { ... }  // access via props.alert
+}
+```
+
+With destructuring:
+```typescript
+function AlertBanner({ alert }: AlertBannerProps) {
+  switch (alert.kind) { ... }        // access directly as alert
+}
+```
+
+Both are identical — destructuring removes the `props.` prefix everywhere. `{ alert }` is JavaScript destructuring, `: AlertBannerProps` is TypeScript typing. They work together to give you clean access to props with full type safety.
+
+---
+
 ### Key takeaways
 
 - `A | B` is a union — the value is either type A or type B
@@ -587,6 +652,8 @@ Files that only use generics (like `filter.ts`) don't need to import the type at
 - A **type guard** narrows a union to a specific member at runtime
 - **Discriminated unions** use a shared `kind` field to let TypeScript know which shape you have inside a `switch`
 - TypeScript only allows fields that exist on the specific narrowed type — accessing `alert.code` on a `SuccessAlert` is a compile error
+- Props interface always lives in the same `.tsx` file as the component
+- `{ alert }: AlertBannerProps` — destructuring + typing in one expression
 
 ---
 
