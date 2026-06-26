@@ -1,3 +1,5 @@
+import { Category } from '../types/expense';
+
 // A generic filter function — works with any array of objects
 export function filterByField<T, K extends keyof T>(
   items: T[],
@@ -13,4 +15,9 @@ export function findById<T extends { id: string }>(
   id: string
 ): T | undefined {
   return items.find(item => item.id === id);
+}
+
+// Type guard — returns true if value is a Category enum value
+export function isCategory(value: string): value is Category {
+  return Object.values(Category).includes(value as Category);
 }

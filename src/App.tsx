@@ -3,6 +3,8 @@ import type { Expense } from './types/expense';
 import { Category } from './types/expense';
 import { ExpenseItem } from './components/ExpenseItem';
 import { filterByField } from './utils/filter';
+import type { Alert } from './types/alert';
+import { AlertBanner } from './components/AlertBanner';
 
 const initialExpenses: Expense[] = [
   {
@@ -32,9 +34,11 @@ const initialExpenses: Expense[] = [
 export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
+  const [alert, setAlert] = useState<Alert | null>(null);
 
   const handleDelete = (id: string) => {
     setExpenses(expenses.filter(e => e.id !== id));
+    setAlert({ kind: 'success', message: 'Expense deleted!' });
   };
 
   const visibleExpenses = selectedCategory === 'All'
@@ -44,6 +48,7 @@ export default function App() {
   return (
     <div>
       <h1>Expense Tracker</h1>
+      {alert && <AlertBanner alert={alert} />}
 
       {/* Category filter buttons */}
       <div>

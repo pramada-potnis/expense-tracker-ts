@@ -439,8 +439,158 @@ The other expenses aren't hidden — they're simply **not rendered at all**.
 
 ---
 
+---
+
+## Step 5: Union Types and Type Guards
+
+**Files:** `src/types/alert.ts`, `src/components/AlertBanner.tsx`, `src/utils/filter.ts`
+
+### Concept 1: Union Types
+
+A union type says a value can be **one of several types**. The `|` means "or".
+
+You already used one in Step 4:
+```typescript
+useState<Category | 'All'>('All')
+```
+
+More examples:
+```typescript
+type ID = string | number;                       // can be either
+type Status = 'active' | 'inactive' | 'pending'; // string literal union
+type MaybeExpense = Expense | null;               // value or null
+```
+
+---
+
+### Concept 2: Type Guards
+
+When you have a union, TypeScript needs you to **narrow it down** before using it. A type guard does that.
+
+```typescript
+// value is Category — type predicate
+export function isCategory(value: string): value is Category {
+  return Object.values(Category).includes(value as Category);
+}
+```
+
+`value is Category` is a **type predicate** — it tells TypeScript "if this function returns true, treat `value` as `Category` from this point on."
+
+---
+
+### Concept 3: Discriminated Unions
+
+The most powerful union pattern. Each member has a unique `kind` field — the **discriminant** — that TypeScript uses to narrow the type.
+
+**File:** `src/types/alert.ts`
+
+```typescript
+type SuccessAlert = {
+  kind: 'success';
+  message: string;
+};
+
+type ErrorAlert = {
+  kind: 'error';
+  message: string;
+  code: number;       // only errors have a code
+};
+
+type LoadingAlert = {
+  kind: 'loading';
+  progress: number;  // only loading has progress
+};
+
+export type Alert = SuccessAlert | ErrorAlert | LoadingAlert;
+```
+
+TypeScript **narrows the type** inside each `case` of a switch — it knows exactly which shape you're dealing with:
+
+```typescript
+function handleAlert(alert: Alert) {
+  switch (alert.kind) {
+    case 'success':
+      console.log(alert.message);
+      // alert.code — TypeScript error! code doesn't exist on SuccessAlert
+      break;
+    case 'error':
+      console.log(alert.message, alert.code);  // code available here
+      break;
+    case 'loading':
+      console.log(alert.progress);  // progress available here
+      break;
+  }
+}
+```
+
+---
+
+### Using it on the UI — AlertBanner component
+
+**File:** `src/components/AlertBanner.tsx`
+
+```typescript
+import type { Alert } from '../types/alert';
+
+interface AlertBannerProps {
+  alert: Alert;
+}
+
+export function AlertBanner({ alert }: AlertBannerProps) {
+  switch (alert.kind) {
+    case 'success':
+      return <div style={{ color: 'green' }}>{alert.message}</div>;
+    case 'error':
+      return <div style={{ color: 'red' }}>{alert.message} (code: {alert.code})</div>;
+    case 'loading':
+      return <div>Loading... {alert.progress}%</div>;
+  }
+}
+```
+
+In `App.tsx`, state holds `Alert | null` — another union:
+```typescript
+const [alert, setAlert] = useState<Alert | null>(null);
+```
+
+`handleDelete` triggers a success alert on delete:
+```typescript
+const handleDelete = (id: string) => {
+  setExpenses(expenses.filter(e => e.id !== id));
+  setAlert({ kind: 'success', message: 'Expense deleted!' });
+};
+```
+
+Rendered conditionally — only shows when alert is not null:
+```typescript
+{alert && <AlertBanner alert={alert} />}
+```
+
+---
+
+### `import type` reminder
+
+Any file importing an `interface` or `type` must use `import type` due to `verbatimModuleSyntax: true`:
+```typescript
+import type { Alert } from '../types/alert';   // interface/type — use import type
+import { Category } from '../types/expense';   // enum — regular import
+```
+
+Files that only use generics (like `filter.ts`) don't need to import the type at all — `T` is the placeholder.
+
+---
+
+### Key takeaways
+
+- `A | B` is a union — the value is either type A or type B
+- String literal unions (`'success' | 'error'`) restrict values to exact strings
+- A **type guard** narrows a union to a specific member at runtime
+- **Discriminated unions** use a shared `kind` field to let TypeScript know which shape you have inside a `switch`
+- TypeScript only allows fields that exist on the specific narrowed type — accessing `alert.code` on a `SuccessAlert` is a compile error
+
+---
+
 ## Up Next
 
-- Step 5: Union types and type guards
 - Step 6: Utility types (Partial, Pick, Omit, Record)
 - Step 7: Async data fetching with typed responses
